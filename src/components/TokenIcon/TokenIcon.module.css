@@ -1,0 +1,31 @@
+.icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: white;
+    overflow: hidden;
+}
+
+.small {
+    width: 24px;
+    height: 24px;
+}
+
+.normal {
+    width: 32px;
+    height: 32px;
+}
+
+.large {
+    width: 48px;
+    height: 48px;
+}
+
+/* Если изображение не загрузилось и показывается текст */
+.icon:empty {
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    padding: 2px;
+} 

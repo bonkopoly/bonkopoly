@@ -1,0 +1,35 @@
+export const BOARD_POSITIONS = {
+  START: 0,
+  JAIL: 10,
+  FREE_PARKING: 20,
+  GO_TO_JAIL: 30
+} as const;
+
+export const PROPERTY_GROUPS = {
+  BROWN: ['BONK STREET', 'DOGE AVENUE'] as const,
+  LIGHT_BLUE: ['MOON BASE', 'MARS COLONY', 'CRYPTO EXCHANGE'] as const,
+  PINK: ['DIAMOND HANDS ST', 'HODL AVENUE', 'PUMP STREET'] as const,
+  ORANGE: ['WHALE BOULEVARD', 'LAMBO LANE', 'YACHT YARD'] as const,
+  RED: ['TESLA TOWER', 'SPACEX SPACEPORT', 'MARS MANSION'] as const,
+  YELLOW: ['DIAMOND DISTRICT', 'GOLD GALLERY', 'PLATINUM PLAZA'] as const,
+  GREEN: ['SATOSHI STREET', 'BITCOIN BOULEVARD', 'ETHEREUM ESTATE'] as const,
+  DARK_BLUE: ['METAVERSE MANOR', 'BONK CASTLE'] as const
+} as const;
+
+export const GAME_SETTINGS = {
+  STARTING_MONEY: 1500,
+  GO_BONUS: 200,
+  MAX_HOUSES_PER_PROPERTY: 4,
+  MAX_HOTELS_PER_PROPERTY: 1,
+  JAIL_TURNS: 3,
+  MAX_DOUBLES: 3
+} as const;
+
+export const SOUND_EFFECTS = {
+  DICE_ROLL: 'diceRoll',
+  PURCHASE: 'purchase',
+  PAYMENT: 'payment',
+  BONUS: 'bonus',
+  ERROR: 'error',
+  SUCCESS: 'success'
+} as const;
