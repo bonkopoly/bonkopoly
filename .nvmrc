@@ -1,0 +1,4 @@
+echo "20" > .nvmrc
+git add .nvmrc
+git commit -m "Set Node.js version to 20"
+git push
