@@ -32,6 +32,7 @@ export interface Property {
   icon?: string;
   tax?: number;
   description?: string;
+  hotels?: number;
 
 }
 
