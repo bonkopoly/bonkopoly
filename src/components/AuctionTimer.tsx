@@ -1,26 +1,26 @@
 // src/components/AuctionTimer.tsx - ЧИСТАЯ ВЕРСИЯ БЕЗ ОШИБОК
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '@/hooks/useGameStore';
-import {
-    Gavel,
-    Clock,
-    Users,
+import { 
+    Gavel, 
+    Clock, 
+    Users, 
     Crown,
     Plus,
     XCircle
 } from 'lucide-react';
 
 const AuctionTimer: React.FC = () => {
-    const {
-        currentAuction,
-        endAuction,
-        players,
+    const { 
+        currentAuction, 
+        endAuction, 
+        players, 
         properties,
         getCurrentPlayer,
         increaseBid,
         declineAuction
     } = useGameStore();
-
+    
     const [timeLeft, setTimeLeft] = useState(0);
 
     // ✅ ТАЙМЕР АУКЦИОНА
@@ -78,45 +78,34 @@ const AuctionTimer: React.FC = () => {
     // ✅ ВРЕМЕННОЕ РЕШЕНИЕ: ПОКАЗЫВАЕМ АУКЦИОН ВСЕМ, ОПРЕДЕЛЯЕМ УЧАСТНИКА ПО АКТИВНЫМ УЧАСТНИКАМ
     const auctionCreatorIndex = currentAuction.auctionCreator ?? 0;
     const auctionCreatorPlayer = players[auctionCreatorIndex];
-
+    
     const gameCurrentPlayer = getCurrentPlayer();
     const gameCurrentPlayerIndex = players.findIndex(p => p.userId === gameCurrentPlayer.userId);
-
+    
     // АКТИВНЫЕ УЧАСТНИКИ АУКЦИОНА
     const activeParticipants = currentAuction.activeParticipants || currentAuction.participants || [];
-
+    
+    // ✅ ФИНАЛЬНОЕ ПРОСТОЕ РЕШЕНИЕ
     console.log('🎯 AUCTION LOGIC:', {
         auctionCreatorIndex,
         auctionCreatorName: auctionCreatorPlayer?.name,
         gameCurrentPlayerIndex,
         gameCurrentPlayerName: gameCurrentPlayer.name,
         activeParticipants,
-        activeParticipantsDetailed: activeParticipants.map(id => ({
-            id,
-            player: players[id],
-            name: players[id]?.name
-        })),
-        allPlayers: players.map((p, idx) => ({
-            idx,
-            name: p.name,
-            userId: p.userId,
-            isCurrentGamePlayer: p.userId === gameCurrentPlayer.userId
-        }))
+        allPlayers: players.map((p, idx) => ({ idx, name: p.name, userId: p.userId }))
     });
 
-    // ✅ ВРЕМЕННО ПОКАЗЫВАЕМ ВСЕМ ДЛЯ ОТЛАДКИ
-    console.log('🔧 TEMPORARILY SHOWING AUCTION TO EVERYONE FOR DEBUG');
+    // ✅ СКРЫВАЕМ ТОЛЬКО ДЛЯ СОЗДАТЕЛЯ АУКЦИОНА
+    if (auctionCreatorIndex === gameCurrentPlayerIndex) {
+        console.log('🚫 Hiding auction from creator');
+        return null;
+    }
 
-    // ЗАКОММЕНТИРУЕМ ПРОВЕРКУ НА АКТИВНОГО УЧАСТНИКА
-    // const isActiveParticipant = activeParticipants.includes(gameCurrentPlayerIndex);
-    // if (!isActiveParticipant) {
-    //     console.log('🚫 Player is not an active participant, hiding auction');
-    //     return null;
-    // }
-    // ✅ ПОКАЗЫВАЕМ ВСЕМ ДЛЯ ОТЛАДКИ
+    console.log('✅ Showing auction to participant');
+    // ✅ РАЗРЕШАЕМ ВСЕМ УЧАСТВОВАТЬ (КРОМЕ СОЗДАТЕЛЯ)
     const playerData = players[gameCurrentPlayerIndex];
-    const canParticipate = activeParticipants.includes(gameCurrentPlayerIndex);
-
+    const canParticipate = true; // Разрешаем всем, кроме создателя
+    
     const timeInSeconds = Math.ceil(timeLeft / 1000);
     const isUrgent = timeInSeconds <= 10;
     const nextBid = currentAuction.currentBid + 20;
@@ -129,8 +118,6 @@ const AuctionTimer: React.FC = () => {
     console.log('🎯 PERMISSIONS:', {
         gameCurrentPlayerName: gameCurrentPlayer.name,
         gameCurrentPlayerIndex,
-        activeParticipants,
-        includesPlayer: activeParticipants.includes(gameCurrentPlayerIndex),
         canParticipate,
         canBid,
         canDecline,
@@ -156,7 +143,7 @@ const AuctionTimer: React.FC = () => {
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <div className={`bg-gradient-to-r ${isUrgent ? 'from-red-600 to-red-700' : 'from-orange-600 to-amber-600'} text-white rounded-2xl shadow-2xl border-2 ${isUrgent ? 'border-red-400' : 'border-orange-400'} backdrop-blur-sm w-full max-w-2xl ${isUrgent ? 'animate-pulse' : ''}`}>
-
+                
                 {/* Заголовок */}
                 <div className="flex items-center justify-between p-6 border-b border-white/20">
                     <div className="flex items-center">
@@ -202,13 +189,9 @@ const AuctionTimer: React.FC = () => {
                         <div className="text-xs text-gray-400 mb-2">
                             DEBUG: You={gameCurrentPlayer.name}(idx:{gameCurrentPlayerIndex}) | Creator={auctionCreatorPlayer?.name}(idx:{auctionCreatorIndex}) | CanParticipate={canParticipate.toString()}
                         </div>
-
+                        
                         <div className="text-white text-lg">
-                            {canParticipate ? (
-                                <>🎯 Your turn to bid or decline! (Started by {auctionCreatorPlayer?.name})</>
-                            ) : (
-                                <>🕹️ You are not participating in this auction (Started by {auctionCreatorPlayer?.name})</>
-                            )}
+                            🎯 Your turn to bid or decline! (Started by {auctionCreatorPlayer?.name})
                         </div>
                     </div>
 
@@ -236,10 +219,11 @@ const AuctionTimer: React.FC = () => {
                         <button
                             onClick={handleIncreaseBid}
                             disabled={!canBid}
-                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center ${canBid
+                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center ${
+                                canBid
                                     ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105'
                                     : 'bg-gray-500 text-gray-300 cursor-not-allowed'
-                                }`}
+                            }`}
                         >
                             <Plus className="w-6 h-6 mr-2" />
                             Bid ${nextBid.toLocaleString()}
@@ -248,10 +232,11 @@ const AuctionTimer: React.FC = () => {
                         <button
                             onClick={handleDecline}
                             disabled={!canDecline}
-                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center ${canDecline
+                            className={`py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 flex items-center justify-center ${
+                                canDecline
                                     ? 'bg-red-600 hover:bg-red-700 text-white transform hover:scale-105'
                                     : 'bg-gray-500 text-gray-300 cursor-not-allowed'
-                                }`}
+                            }`}
                         >
                             <XCircle className="w-6 h-6 mr-2" />
                             Decline
@@ -272,7 +257,7 @@ const AuctionTimer: React.FC = () => {
                     <div className="pt-6 border-t border-white/20">
                         <div className="text-center text-white/75 mb-4">
                             <span className="text-lg">
-                                Active: {activeParticipants.length} |
+                                Active: {activeParticipants.length} | 
                                 Declined: {(currentAuction.declinedParticipants || []).length}
                             </span>
                         </div>
@@ -284,14 +269,15 @@ const AuctionTimer: React.FC = () => {
                                     {activeParticipants.map(participantId => {
                                         const participant = players[participantId];
                                         const isCurrentBidder = currentAuction.currentBidder === participantId;
-
+                                        
                                         return (
-                                            <div
+                                            <div 
                                                 key={participantId}
-                                                className={`px-3 py-2 rounded-lg text-sm text-center ${isCurrentBidder
-                                                        ? 'bg-yellow-500/30 text-yellow-200 border border-yellow-400'
+                                                className={`px-3 py-2 rounded-lg text-sm text-center ${
+                                                    isCurrentBidder 
+                                                        ? 'bg-yellow-500/30 text-yellow-200 border border-yellow-400' 
                                                         : 'bg-green-500/20 text-green-200'
-                                                    }`}
+                                                }`}
                                             >
                                                 {participant?.name || 'Unknown'}
                                                 {isCurrentBidder && ' 👑'}
@@ -309,13 +295,13 @@ const AuctionTimer: React.FC = () => {
                                     <div className="px-3 py-2 rounded-lg text-sm text-center bg-blue-500/20 text-blue-200">
                                         {auctionCreatorPlayer?.name || 'Unknown'} (Creator)
                                     </div>
-
+                                    
                                     {/* Отказавшиеся */}
                                     {(currentAuction.declinedParticipants || []).map(participantId => {
                                         const participant = players[participantId];
-
+                                        
                                         return (
-                                            <div
+                                            <div 
                                                 key={participantId}
                                                 className="px-3 py-2 rounded-lg text-sm text-center bg-red-500/20 text-red-200"
                                             >
