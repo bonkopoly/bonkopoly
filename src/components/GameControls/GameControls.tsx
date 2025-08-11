@@ -1,7 +1,7 @@
 // GameControls.tsx - ПОЛНАЯ ВЕРСИЯ С КНОПКОЙ АУКЦИОНА
 
 import React, { useState } from 'react';
-import { Dice1, Dice2, Home, ArrowRight, Users, Building2, Clock, Settings, Gavel } from 'lucide-react';
+import { Dice1, Dice2, Home, ArrowRight, Users, Building2, Clock, Settings, Gavel, Flag } from 'lucide-react';
 import { useGameStore } from '@/hooks/useGameStore';
 import DiceDisplay from './DiceDisplay';
 import { realtimeGameService } from '@/lib/supabase';
@@ -33,7 +33,8 @@ const GameControls: React.FC<GameControlsProps> = ({
         closeBuildingControls,
         players,
         startPropertyAuction,
-        properties
+        properties,
+        handleBankruptcy
     } = useGameStore();
 
     // ИСПРАВЛЯЕМ ПОРЯДОК: сначала вычисляем isMyTurn, потом используем
@@ -219,6 +220,50 @@ const GameControls: React.FC<GameControlsProps> = ({
         }
     };
 
+    const handleSurrender = async () => {
+        if (!canIPlay) {
+            addToLog(`⏳ Wait for your turn! It's ${currentPlayer.name}'s turn.`);
+            return;
+        }
+
+        if (!myPlayer) {
+            addToLog(`❌ Player data not found!`);
+            return;
+        }
+
+        // Проверяем, действительно ли игрок в плохом положении
+        const totalAssets = useGameStore.getState().calculatePlayerAssets(myPlayerIndex);
+        
+        if (myPlayer.money > 0 || totalAssets > 0) {
+            addToLog(`⚠️ You still have money ($${myPlayer.money}) and assets ($${totalAssets}). Are you sure you want to surrender?`);
+            // Здесь можно добавить подтверждение
+        }
+
+        try {
+            // Проверяем банкротство перед сдачей
+            if (myPlayer.money <= 0 && totalAssets <= 0) {
+                addToLog(`💀 ${myPlayer.name} is already bankrupt!`);
+                return;
+            }
+
+            handleBankruptcy(myPlayerIndex);
+
+            const newState = useGameStore.getState();
+            const metadata = {
+                playerId: currentUserId,
+                action: 'surrender',
+                playerName: myPlayer.name,
+                timestamp: Date.now()
+            };
+
+            await realtimeGameService.updateGameState(roomId!, newState, metadata);
+            addToLog(`🏳️ ${myPlayer.name} surrendered and went bankrupt!`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            addToLog(`❌ Error surrendering: ${errorMessage}`);
+        }
+    };
+
     const handleOpenBuildingControls = () => {
         if (!canIPlay) {
             addToLog(`⏳ Wait for your turn! It's ${currentPlayer.name}'s turn.`);
@@ -296,6 +341,19 @@ const GameControls: React.FC<GameControlsProps> = ({
                     >
                         <Gavel className="w-3 h-3" />
                         <span>START AUCTION</span>
+                    </button>
+
+                    {/* КНОПКА СДАЧИ */}
+                    <button
+                        onClick={handleSurrender}
+                        disabled={!canIPlay}
+                        className={`w-full font-bold py-2 px-3 rounded-lg transform transition-all duration-200 text-xs flex items-center justify-center space-x-1 ${canIPlay
+                            ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white hover:scale-105'
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                            }`}
+                    >
+                        <span className="text-lg">🏳️</span>
+                        <span>SURRENDER</span>
                     </button>
 
                     <button

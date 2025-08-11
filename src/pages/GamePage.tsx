@@ -15,7 +15,9 @@ import { supabase } from '../lib/supabase';
 import TradeModal from '../components/TradeModal/TradeModal';
 import PropertyManagementPanel from '../components/PropertyManagementPanel';
 import PropertyPurchaseModal from '../components/PropertyPurchaseModal'; // ДОБАВЛЯЕМ
-    import AuctionTimer from '../components/AuctionTimer'; // ДОБАВЛЯЕМ
+import AuctionTimer from '../components/AuctionTimer'; // ДОБАВЛЯЕМ
+import VictoryModal from '../components/VictoryModal'; // ДОБАВЛЯЕМ
+import BankruptcyRedirect from '../components/BankruptcyRedirect'; // ДОБАВЛЯЕМ
 
 const GamePage: React.FC = () => {
     const [showLeaderboard, setShowLeaderboard] = useState(true);
@@ -38,6 +40,10 @@ const GamePage: React.FC = () => {
         closeBuildingControls,
         selectedProperty: storeSelectedProperty, // ДОБАВЛЯЕМ ИЗ STORE
         properties, // ДОБАВЛЯЕМ ИЗ STORE
+        gameEnded,
+        winner,
+        showVictoryModal,
+        setShowVictoryModal,
     } = useGameStore();
 
     const { roomId } = useParams<{ roomId: string }>();
@@ -383,7 +389,29 @@ const GamePage: React.FC = () => {
             )}
 
             {/* ДОБАВЛЯЕМ AuctionTimer */}
-         <AuctionTimer />
+            <AuctionTimer />
+
+                    {/* ДОБАВЛЯЕМ VictoryModal */}
+        {winner && (
+            <VictoryModal
+                isOpen={showVictoryModal}
+                winner={{
+                    name: winner.name,
+                    color: winner.color,
+                    icon: winner.icon,
+                    money: winner.money,
+                    properties: winner.properties.length
+                }}
+                roomId={roomId || ''}
+                onClose={() => setShowVictoryModal(false)}
+            />
+        )}
+
+        {/* ДОБАВЛЯЕМ BankruptcyRedirect */}
+        <BankruptcyRedirect 
+            roomId={roomId || ''} 
+            currentUserId={currentUserId} 
+        />
         </div>
     );
 };

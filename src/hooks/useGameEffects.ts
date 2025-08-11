@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useGameStore } from './useGameStore';
 
 export const useGameEffects = () => {
-  const { gameLog, players } = useGameStore();
+  const { gameLog, players, calculatePlayerAssets, handleBankruptcy, checkGameEnd } = useGameStore();
 
   useEffect(() => {
     // React to game log changes and trigger effects
@@ -25,11 +25,26 @@ export const useGameEffects = () => {
   }, [gameLog]);
 
   useEffect(() => {
+    // Check for bankruptcy conditions
+    players.forEach((player, index) => {
+      if (player.bankrupt) return; // Уже банкрот
+      
+      if (player.money < 0) {
+        // Игрок имеет отрицательный баланс - проверяем активы
+        const totalAssets = calculatePlayerAssets(index);
+        
+        if (totalAssets <= 0) {
+          // Нет активов для продажи - банкротство
+          console.log(`💀 Player ${player.name} is bankrupt - no money and no assets`);
+          handleBankruptcy(index);
+        } else {
+          // Есть активы, но нужно продать/заложить
+          console.log(`⚠️ Player ${player.name} needs to sell/mortgage assets to pay debts`);
+        }
+      }
+    });
+
     // Check for game over conditions
-    const activePlayers = players.filter(p => p.money > 0);
-    if (activePlayers.length === 1 && players.length > 1) {
-      // Game over logic
-      console.log(`🏆 ${activePlayers[0].name} wins!`);
-    }
-  }, [players]);
+    checkGameEnd();
+  }, [players, calculatePlayerAssets, handleBankruptcy]);
 };

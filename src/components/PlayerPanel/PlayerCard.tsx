@@ -16,7 +16,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isActive }) => {
         backgroundColor: isActive ? 'rgba(255, 107, 53, 0.1)' : 'rgba(107, 114, 128, 0.1)'
       }}
       className={`p-3 rounded-lg border-2 transition-all duration-300 ${
-        isActive ? 'border-bonk-orange bg-bonk-orange/10' : 'border-gray-600 bg-gray-800/20'
+        player.bankrupt 
+          ? 'border-red-600 bg-red-900/20 opacity-50' 
+          : isActive 
+            ? 'border-bonk-orange bg-bonk-orange/10' 
+            : 'border-gray-600 bg-gray-800/20'
       }`}
     >
       <div className="flex items-center justify-between">
@@ -34,12 +38,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isActive }) => {
         </div>
         <div className="text-right">
           <div className={`font-bold text-lg ${
-            player.money < 500 ? 'text-red-400' : 'text-green-400'
+            player.bankrupt ? 'text-red-600' : player.money < 500 ? 'text-red-400' : 'text-green-400'
           }`}>
-            ${player.money}
+            {player.bankrupt ? '💀 BANKRUPT' : `$${player.money}`}
           </div>
-          {player.inJail && (
+          {player.inJail && !player.bankrupt && (
             <div className="text-xs text-red-400">🚔 IN JAIL</div>
+          )}
+          {player.bankrupt && (
+            <div className="text-xs text-red-600 font-bold">💀 OUT OF GAME</div>
           )}
         </div>
       </div>

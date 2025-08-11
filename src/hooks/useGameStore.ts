@@ -76,6 +76,14 @@ interface GameStore {
     lastActionTimestamp?: number;
     hasBuiltThisTurn: boolean;
 
+    // Game End State
+    gameEnded: boolean;
+    winner: Player | null;
+    showVictoryModal: boolean;
+    setShowVictoryModal: (show: boolean) => void;
+    checkGameEnd: () => void;
+    resetGame: () => void;
+
     setRoomId: (roomId: string) => void;
     saveGameState: () => Promise<void>;
     loadGameState: (roomId: string) => Promise<boolean>;
@@ -212,23 +220,125 @@ const addImportantLog = (state: GameStore, message: string) => {
     }
 };
 
-export const useGameStore = create<GameStore>((set, get) => ({
-    gameStarted: false,
-    players: [],
-    properties: createAllProperties(),
-    currentPlayer: 0,
-    selectedProperty: null,
-    setSelectedProperty: (propertyId) => set({ selectedProperty: propertyId }),
-    diceRolled: false,
-    lastRoll: [1, 1],
-    gameLog: [],
-    doubleCount: 0,
-    chanceCards: [...CHANCE_CARDS].sort(() => Math.random() - 0.5), // Перемешиваем карточки
-    communityChestCards: [...COMMUNITY_CHEST_CARDS].sort(() => Math.random() - 0.5),
-    currentCard: null,
-    isBuildingControlsOpen: false,
-    hasBuiltThisTurn: false,
-    currentAuction: null,
+
+
+export const useGameStore = create<GameStore>((set, get) => {
+    // Вспомогательная функция для безопасного списания денег с проверкой банкротства
+    const safeChargePlayer = (playerId: number, amount: number, reason: string): boolean => {
+        const state = get();
+        const player = state.players[playerId];
+        
+        if (player.money >= amount) {
+            // Игрок может заплатить
+            set(state => ({
+                ...state,
+                players: state.players.map(p =>
+                    p.id === player.id ? { ...p, money: p.money - amount } : p
+                )
+            }));
+            addImportantLog(state, `💸 ${player.name} paid $${amount} for ${reason}`);
+            return true;
+        } else {
+            // Игрок не может заплатить - проверяем банкротство
+            const totalAssets = get().calculatePlayerAssets(playerId);
+            
+            if (totalAssets >= amount) {
+                // У игрока есть активы для продажи/залога
+                addImportantLog(state, `⚠️ ${player.name} cannot pay $${amount} for ${reason}! Need to sell/mortgage assets.`);
+                return false;
+            } else {
+                // Игрок банкрот
+                addImportantLog(state, `💀 ${player.name} is bankrupt! Cannot pay $${amount} for ${reason}.`);
+                get().handleBankruptcy(playerId);
+                return false;
+            }
+        }
+    };
+
+    return {
+        gameStarted: false,
+        players: [],
+        properties: createAllProperties(),
+        currentPlayer: 0,
+        selectedProperty: null,
+        setSelectedProperty: (propertyId) => set({ selectedProperty: propertyId }),
+        diceRolled: false,
+        lastRoll: [1, 1],
+        gameLog: [],
+        doubleCount: 0,
+        chanceCards: [...CHANCE_CARDS].sort(() => Math.random() - 0.5), // Перемешиваем карточки
+        communityChestCards: [...COMMUNITY_CHEST_CARDS].sort(() => Math.random() - 0.5),
+        currentCard: null,
+        isBuildingControlsOpen: false,
+        hasBuiltThisTurn: false,
+        currentAuction: null,
+
+        // Game End State
+        gameEnded: false,
+        winner: null,
+        showVictoryModal: false,
+        setShowVictoryModal: (show: boolean) => set({ showVictoryModal: show }),
+        checkGameEnd: () => {
+            const state = get();
+            const activePlayers = state.players.filter(p => !p.bankrupt && p.money >= 0);
+            
+            if (activePlayers.length === 1 && state.players.length > 1) {
+                const winner = activePlayers[0];
+                const timestamp = Date.now();
+                
+                set({ 
+                    gameEnded: true, 
+                    winner,
+                    showVictoryModal: true 
+                });
+                addImportantLog(state, `🏆 ${winner.name} wins the game!`);
+                
+                // Save to database
+                get().saveGameState();
+                
+                // Immediately sync to all clients
+                if (get().roomId) {
+                    setTimeout(async () => {
+                        try {
+                            const newState = get();
+                            const metadata = {
+                                action: 'gameEnded',
+                                winnerId: winner.userId,
+                                winnerName: winner.name,
+                                timestamp
+                            };
+                            await realtimeGameService.updateGameState(get().roomId!, newState, metadata);
+                            console.log('✅ Synced game end state');
+                        } catch (error) {
+                            console.error('❌ Failed to sync game end state:', error);
+                        }
+                    }, 0);
+                }
+            }
+        },
+        resetGame: () => {
+            set({
+                gameEnded: false,
+                winner: null,
+                showVictoryModal: false,
+                gameStarted: false,
+                players: [],
+                currentPlayer: 0,
+                diceRolled: false,
+                lastRoll: [1, 1],
+                gameLog: [],
+                doubleCount: 0,
+                hasBuiltThisTurn: false,
+                currentAuction: null,
+                selectedProperty: null,
+                currentCard: null,
+                isBuildingControlsOpen: false,
+                activeTradeOffers: [],
+                tradeSessions: [],
+                isTradeModalOpen: false,
+                currentTradeSession: null
+            });
+        },
 
     roomId: null,
     setRoomId: (roomId: string) => {
@@ -802,6 +912,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             };
         });
 
+        // Проверяем, не закончилась ли игра
+        setTimeout(() => {
+            get().checkGameEnd();
+        }, 100);
+
         // Синхронизируем банкротство
         if (get().roomId) {
             setTimeout(async () => {
@@ -843,6 +958,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const state = get();
         const property = state.properties[propertyId];
         const auctionCreator = state.currentPlayer;
+
+        // Проверяем, что аукцион еще не запущен
+        if (state.currentAuction) {
+            console.log('🚫 Auction already in progress, cannot start new one');
+            return;
+        }
 
         const participants = state.players
             .map((_, index) => index)
@@ -1511,7 +1632,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeTradeOffers: state.activeTradeOffers,
             tradeSessions: state.tradeSessions,
             isTradeModalOpen: state.isTradeModalOpen,
-            currentTradeSession: state.currentTradeSession
+            currentTradeSession: state.currentTradeSession,
+
+            // Game End State
+            gameEnded: state.gameEnded,
+            winner: state.winner,
+            showVictoryModal: state.showVictoryModal
         };
 
         try {
@@ -1541,7 +1667,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
                     activeTradeOffers: gameState.activeTradeOffers || [],
                     tradeSessions: gameState.tradeSessions || [],
                     isTradeModalOpen: gameState.isTradeModalOpen || false,
-                    currentTradeSession: gameState.currentTradeSession || null
+                    currentTradeSession: gameState.currentTradeSession || null,
+
+                    // Game End State
+                    gameEnded: gameState.gameEnded || false,
+                    winner: gameState.winner || null,
+                    showVictoryModal: gameState.showVictoryModal || false
                 });
                 return true;
             }
@@ -1607,6 +1738,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             activeTradeOffers: gameState.activeTradeOffers || [],
             tradeSessions: gameState.tradeSessions || [],
             currentTradeSession: gameState.currentTradeSession || null,
+
+            // Game End State
+            gameEnded: gameState.gameEnded || false,
+            winner: gameState.winner || null,
+            showVictoryModal: gameState.showVictoryModal || false,
 
             // Timestamp для отслеживания
             lastActionTimestamp: metadata?.timestamp || Date.now()
@@ -1973,14 +2109,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 const owner = state.players[property.owner];
                 const rent = get().getPropertyRent(player.position);
 
-                player.money -= rent;
-                newPlayers[playerId] = player;
+                // Проверяем, может ли игрок заплатить ренту
+                if (player.money >= rent) {
+                    player.money -= rent;
+                    newPlayers[playerId] = player;
 
-                const updatedOwner = { ...owner, money: owner.money + rent };
-                newPlayers[property.owner] = updatedOwner;
+                    const updatedOwner = { ...owner, money: owner.money + rent };
+                    newPlayers[property.owner] = updatedOwner;
 
-                addImportantLog(state, `💸 ${player.name} paid $${rent} rent to ${owner.name}!`);
-                rentPaid = { amount: rent, to: owner.name, toPlayerId: property.owner };
+                    addImportantLog(state, `💸 ${player.name} paid $${rent} rent to ${owner.name}!`);
+                    rentPaid = { amount: rent, to: owner.name, toPlayerId: property.owner };
+                } else {
+                    // Игрок не может заплатить ренту - проверяем банкротство
+                    const totalAssets = get().calculatePlayerAssets(playerId);
+                    
+                    if (totalAssets >= rent) {
+                        // У игрока есть активы для продажи/залога
+                        addImportantLog(state, `⚠️ ${player.name} cannot pay $${rent} rent! Need to sell/mortgage assets.`);
+                        // Здесь можно добавить модальное окно для выбора активов для продажи
+                    } else {
+                        // Игрок банкрот
+                        addImportantLog(state, `💀 ${player.name} is bankrupt! Cannot pay $${rent} rent.`);
+                        get().handleBankruptcy(playerId);
+                    }
+                }
             }
             // Покупка
             else if (property.owner === null && property.price > 0 &&
@@ -2740,4 +2892,5 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
         get().saveGameState();
     }
-}));
+    }
+});

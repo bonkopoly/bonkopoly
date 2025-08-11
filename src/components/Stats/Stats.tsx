@@ -16,8 +16,11 @@ const Stats: React.FC = () => {
     const totalHotels = properties.reduce((sum, prop) => sum + (prop.hotels || 0), 0);
 
     // Самый богатый и самый бедный игрок
-    const richestPlayer = [...players].sort((a, b) => b.money - a.money)[0];
-    const poorestPlayer = [...players].sort((a, b) => a.money - b.money)[0];
+    const activePlayers = players.filter(p => !p.bankrupt);
+    const bankruptPlayers = players.filter(p => p.bankrupt);
+    
+    const richestPlayer = activePlayers.length > 0 ? [...activePlayers].sort((a, b) => b.money - a.money)[0] : players[0];
+    const poorestPlayer = activePlayers.length > 0 ? [...activePlayers].sort((a, b) => a.money - b.money)[0] : players[0];
 
     // Форматирование денег
     const formatMoney = (amount: number) => {
@@ -86,6 +89,22 @@ const Stats: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Банкроты */}
+            {bankruptPlayers.length > 0 && (
+                <div className="text-xs pt-2 border-t border-gray-700">
+                    <div className="text-gray-400 mb-2">Bankrupt Players</div>
+                    <div className="space-y-1">
+                        {bankruptPlayers.map(player => (
+                            <div key={player.id} className="font-mono text-red-400 flex items-center gap-2">
+                                <PlayerDot color={player.color} />
+                                {player.name}
+                                <span className="text-red-600">💀 OUT</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

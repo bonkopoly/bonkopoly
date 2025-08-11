@@ -46,12 +46,14 @@ export const Game: React.FC = () => {
     
     // Получаем текущего пользователя
     const currentUserId = getCurrentPlayer()?.userId || null;
-    const currentPlayerData = players[currentPlayer];
+    const currentPlayerData = players.find(p => p.userId === currentUserId);
+    const isLowOnCash = (currentPlayerData?.money || 0) < 200;
+    const isBankrupt = currentPlayerData?.bankrupt || false;
+    const hasNoAssets = currentPlayerData && useGameStore.getState().calculatePlayerAssets(players.findIndex(p => p.userId === currentUserId)) <= 0;
     
     // НОВЫЕ ВЫЧИСЛЕНИЯ ДЛЯ UI:
     const myPropertiesCount = currentPlayerData?.properties?.length || 0;
-    const totalAssets = calculatePlayerAssets ? calculatePlayerAssets(currentPlayer) : 0;
-    const isLowOnCash = currentPlayerData?.money < 200;
+    const totalAssets = currentPlayerData ? useGameStore.getState().calculatePlayerAssets(players.findIndex(p => p.userId === currentUserId)) : 0;
 
     useEffect(() => {
         console.log('🔄 useEffect triggered. roomId:', roomId, 'initialized:', initialized);
@@ -177,7 +179,7 @@ export const Game: React.FC = () => {
             )}
             
             {/* Предупреждение о банкротстве */}
-            {isLowOnCash && myPropertiesCount > 0 && (
+            {isLowOnCash && myPropertiesCount > 0 && !isBankrupt && (
                 <div className="fixed bottom-24 right-4 bg-red-900/80 border-2 border-red-500 text-white p-3 rounded-xl backdrop-blur-sm" style={{ zIndex: 999 }}>
                     <div className="flex items-center text-red-200 mb-2">
                         <TrendingDown className="w-4 h-4 mr-2" />
@@ -185,6 +187,19 @@ export const Game: React.FC = () => {
                     </div>
                     <div className="text-xs">
                         Consider mortgaging properties or selling buildings
+                    </div>
+                </div>
+            )}
+
+            {/* Критическое предупреждение о банкротстве */}
+            {!isBankrupt && hasNoAssets && (currentPlayerData?.money || 0) <= 0 && (
+                <div className="fixed bottom-24 right-4 bg-orange-900/80 border-2 border-orange-500 text-white p-3 rounded-xl backdrop-blur-sm animate-pulse" style={{ zIndex: 999 }}>
+                    <div className="flex items-center text-orange-200 mb-2">
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        <span className="font-bold text-sm">Critical Situation!</span>
+                    </div>
+                    <div className="text-xs">
+                        No money and no assets. Consider surrendering.
                     </div>
                 </div>
             )}
